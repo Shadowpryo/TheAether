@@ -199,6 +199,7 @@ func (h *RegistrationHandler) StartRegistration(s *discordgo.Session, m *discord
 	privateMessage = privateMessage + "and choosing a set of starter equipment.\n\n"
 	privateMessage = privateMessage + "You don't need to remember all of that though, for now you can begin by typing ~roll-attributes\""
 
+
 	time.Sleep(time.Duration(time.Second * 10))
 	s.ChannelMessageSend(userprivatechannel.ID, privateMessage)
 
@@ -276,6 +277,44 @@ func (h *RegistrationHandler) FinishRegistration(s *discordgo.Session, m *discor
 
 	s.ChannelMessageSend(m.ChannelID, "Registration complete, please enjoy your journey through *The Aether*!")
 	return
+}
+
+// ConfirmName Function
+func (h *RegistrationHandler) ConfirmName(name string, s *discordgo.Session, m *discordgo.MessageCreate) {
+
+	// We do this to avoid having duplicate commands overrunning each other
+	cp := h.conf.MainConfig.CP
+	if strings.HasPrefix(m.Content, cp) {
+		s.ChannelMessageSend(m.ChannelID, "Invalid")
+		return
+	}
+
+	m.Content = strings.ToLower(m.Content)
+	m.Content = strings.Title(m.Content)
+	user, err := h.db.GetUser(m.Author.ID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Could not retrieve usermanager record: "+err.Error())
+		return
+	}
+
+	user.Name = m.Content
+
+	err = h.user.usermanager.SaveUserToDB(user)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Could not complete registration: "+err.Error())
+		return
+	}
+
+
+	//err := h.SetRegistrationStep("Name", m.Author.ID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Could not complete registration: "+err.Error())
+		return
+	}
+	s.ChannelMessageSend(m.ChannelID, user.Name + " You may now proceed with your "+
+		"avatar creation by using the "+h.conf.MainConfig.CP+"pick-race command")
+	return
+
 }
 
 // RollAttributes function
@@ -379,7 +418,9 @@ func (h *RegistrationHandler) ConfirmAttributes(command string, s *discordgo.Ses
 		return
 	}
 	s.ChannelMessageSend(m.ChannelID, "Attributes assigned! You may now proceed with your "+
-		"avatar creation by using the "+h.conf.MainConfig.CP+"pick-race command")
+		//"avatar creation by using the "+h.conf.MainConfig.CP+"pick-race command")
+	"avatar creation now, what is your name? ")
+	h.callback.Watch(h.ConfirmName, GetUUIDv2(), m.Content, s, m)
 	return
 }
 
@@ -820,7 +861,7 @@ func (h *RegistrationHandler) ChooseSkills(s *discordgo.Session, m *discordgo.Me
 		skilloption := payload[0]
 		if h.ValidateSkillChoice(skilloption) {
 			s.ChannelMessageSend(m.ChannelID, "You have chosen: "+skilloption+"\nConfirm? (Yes/No)\n")
-			h.callback.Watch(h.ConfirmClass, GetUUIDv2(), skilloption, s, m)
+			//h.callback.Watch(h.ConfirmSkill, GetUUIDv2(), skilloption, s, m)
 			return
 		}
 		s.ChannelMessageSend(m.ChannelID, ":sparkles: Invalid Skill Choice! You may pick from one of the following skills: \n```"+
